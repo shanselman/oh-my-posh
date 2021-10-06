@@ -1,0 +1,41 @@
+name: Scoop
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: ${{ github.workspace }}/packages/scoop
+    env:
+      GH_KEY: ${{ secrets.GH_PAT }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Update Template
+      run: |
+        $version = $env:GITHUB_REF.TrimStart("refs/tags/v")
+        # ./build.ps1 -Version $version
+    - name: Upload Scoop JSON
+      id: upload-scoop-json
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release.outputs.upload_url }}
+        asset_path: ${{ github.workspace }}/packages/scoop/oh-my-posh.json
+        asset_name: oh-my-posh.json
+        asset_content_type: text/plain
+    - name: Upload Scoop Archive
+      id: upload-scoop-post-install
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ needs.release.outputs.upload_url }}
+        asset_path: ${{ github.workspace }}/packages/scoop/posh-windows-amd64.7z
+        asset_name: posh-windows-amd64.7z
+        asset_content_type: application/octet-stream

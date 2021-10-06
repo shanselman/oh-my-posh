@@ -1,0 +1,21 @@
+name: PowerShell
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_KEY: ${{ secrets.GH_PAT }}
+    steps:
+    - name: Push Version
+      run: |
+        $version = $env:GITHUB_REF.TrimStart("refs/tags/v")
+        curl -XPOST -u "jandedobbeleer:$GH_KEY" \
+        -H "Accept: application/vnd.github.everest-preview+json" \
+        -H "Content-Type: application/json" https://api.github.com/repos/jandedobbeleer/homebrew-oh-my-posh/actions/workflows/release.yml/dispatches \
+        --data '{"ref": "main", "inputs": {"version": $version} }'
