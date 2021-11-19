@@ -29,6 +29,7 @@ type Config struct {
 	Blocks               []*Block          `config:"blocks"`
 	Tooltips             []*Segment        `config:"tooltips"`
 	TransientPrompt      *TransientPrompt  `config:"transient_prompt"`
+	Palette              map[string]string `config:"palette"`
 }
 
 type TransientPrompt struct {

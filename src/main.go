@@ -212,6 +212,7 @@ func main() {
 		writer = &AnsiWriter{
 			ansi:               ansi,
 			terminalBackground: getConsoleBackgroundColor(env, cfg.TerminalBackground),
+			palette:            cfg.Palette,
 		}
 	}
 	title := &consoleTitle{

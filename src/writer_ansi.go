@@ -60,6 +60,7 @@ type promptWriter interface {
 type AnsiWriter struct {
 	builder            strings.Builder
 	ansi               *ansiUtils
+	palette            map[string]string
 	terminalBackground string
 	Colors             *Color
 	ParentColors       *Color
@@ -158,17 +159,35 @@ func (a *AnsiWriter) write(background, foreground, text string) {
 	}
 
 	getAnsiColors := func(background, foreground string) (string, string) {
+		getPaletteColor := func(color string) string {
+			mapPaletteColor := func(color string) string {
+				color = strings.TrimLeft(color, "p:")
+				if color, found := a.palette[color]; found {
+					return color
+				}
+				return "#111111"
+			}
+			for strings.HasPrefix(color, "p:") {
+				color = mapPaletteColor(color)
+			}
+			return color
+		}
 		getColorString := func(color string) string {
+			color = getPaletteColor(color)
 			if color == Background {
-				color = a.Colors.Background
-			} else if color == Foreground {
-				color = a.Colors.Foreground
-			} else if color == ParentBackground && a.ParentColors != nil {
-				color = a.ParentColors.Background
-			} else if color == ParentForeground && a.ParentColors != nil {
-				color = a.ParentColors.Foreground
-			} else if (color == ParentForeground || color == ParentBackground) && a.ParentColors == nil {
-				color = Transparent
+				return getPaletteColor(a.Colors.Background)
+			}
+			if color == Foreground {
+				return getPaletteColor(a.Colors.Foreground)
+			}
+			if color == ParentBackground && a.ParentColors != nil {
+				return getPaletteColor(a.ParentColors.Background)
+			}
+			if color == ParentForeground && a.ParentColors != nil {
+				return getPaletteColor(a.ParentColors.Foreground)
+			}
+			if (color == ParentForeground || color == ParentBackground) && a.ParentColors == nil {
+				return Transparent
 			}
 			return color
 		}
