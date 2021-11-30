@@ -8,6 +8,12 @@ import (
 type nightscout struct {
 	props *properties
 	env   environmentInfo
+
+	url          string
+	cacheTimeout int
+
+	getFunc func() (*nightscoutData, error)
+
 	// array of nightscoutData (is often just 1, and we will pick the ZEROeth)
 
 	Sgv       int64
@@ -37,7 +43,7 @@ type nightscoutData struct {
 }
 
 func (ns *nightscout) enabled() bool {
-	data, err := ns.getResult()
+	data, err := ns.getFunc()
 	if err != nil {
 		return false
 	}
@@ -85,50 +91,66 @@ func (ns *nightscout) string() string {
 	return text
 }
 
-func (ns *nightscout) getResult() (*nightscoutData, error) {
-	url := ns.props.getString(URL, "")
-	// natural and understood NS timeout is 5, anything else is unusual
-	cacheTimeout := ns.props.getInt(NSCacheTimeout, 5)
-	response := &nightscoutData{}
-	if cacheTimeout > 0 {
-		// check if data stored in cache
-		val, found := ns.env.cache().get(url)
-		// we got something from the cache
-		if found {
-			err := json.Unmarshal([]byte(val), response)
-			if err != nil {
-				return nil, err
-			}
-			return response, nil
-		}
-	}
-
+func (ns *nightscout) getData() (*nightscoutData, error) {
 	httpTimeout := ns.props.getInt(HTTPTimeout, DefaultHTTPTimeout)
 
-	body, err := ns.env.doGet(url, httpTimeout)
+	body, err := ns.env.doGet(ns.url, httpTimeout)
 	if err != nil {
-		return &nightscoutData{}, err
+		return nil, err
 	}
 	var arr []*nightscoutData
 	err = json.Unmarshal(body, &arr)
 	if err != nil {
-		return &nightscoutData{}, err
+		return nil, err
 	}
 
 	firstelement := arr[0]
-	firstData, err := json.Marshal(firstelement)
-	if err != nil {
-		return &nightscoutData{}, err
-	}
 
-	if cacheTimeout > 0 {
-		// persist new sugars in cache
-		ns.env.cache().set(url, string(firstData), cacheTimeout)
-	}
 	return firstelement, nil
+}
+
+func (ns *nightscout) withCache(wrappedFunc func() (*nightscoutData, error)) func() (*nightscoutData, error) {
+	return func() (*nightscoutData, error) {
+		cacheKey := ns.url
+
+		serializedDataFromCache, foundInCache := ns.env.cache().get(cacheKey)
+
+		if foundInCache {
+			dataFromCache := &nightscoutData{}
+			err := json.Unmarshal([]byte(serializedDataFromCache), dataFromCache)
+			if err == nil {
+				return dataFromCache, nil
+			}
+		}
+
+		data, err := wrappedFunc()
+		if err != nil {
+			return nil, err
+		}
+
+		serializedData, err := json.Marshal(data)
+		if err == nil {
+			ns.env.cache().set(cacheKey, string(serializedData), ns.cacheTimeout)
+		}
+
+		return data, nil
+	}
 }
 
 func (ns *nightscout) init(props *properties, env environmentInfo) {
 	ns.props = props
 	ns.env = env
+
+	ns.url = ns.props.getString(URL, "")
+	ns.cacheTimeout = ns.props.getInt(NSCacheTimeout, 5)
+
+	ns.getFunc = ns.getData
+
+	if ns.isCacheEnabled() {
+		ns.getFunc = ns.withCache(ns.getFunc)
+	}
+}
+
+func (ns *nightscout) isCacheEnabled() bool {
+	return ns.cacheTimeout > 0
 }
