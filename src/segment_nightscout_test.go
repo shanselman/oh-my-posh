@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -99,10 +100,8 @@ func TestNSSegment(t *testing.T) {
 			props.values[SegmentTemplate] = tc.Template
 		}
 
-		ns := &nightscout{
-			props: props,
-			env:   env,
-		}
+		ns := &nightscout{}
+		ns.init(props, env)
 
 		enabled := ns.enabled()
 		assert.Equal(t, tc.ExpectedEnabled, enabled, tc.Case)
@@ -112,4 +111,65 @@ func TestNSSegment(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedString, ns.string(), tc.Case)
 	}
+}
+
+func TestCacheEnabled(t *testing.T) {
+	env := &MockedEnvironment{}
+	props := &properties{
+		values: map[Property]interface{}{
+			CacheTimeout: 1,
+			URL:          "FAKE",
+		},
+	}
+
+	ns := &nightscout{}
+	ns.init(props, env)
+
+	assert.True(t, ns.isCacheEnabled(), "Cache should be enabled")
+}
+
+func TestCacheDisabled(t *testing.T) {
+	env := &MockedEnvironment{}
+	props := &properties{
+		values: map[Property]interface{}{
+			CacheTimeout: 0,
+			URL:          "FAKE",
+		},
+	}
+
+	ns := &nightscout{}
+	ns.init(props, env)
+
+	assert.False(t, ns.isCacheEnabled(), "Cache should be disabled")
+}
+
+func TestDataFromCacheReturned(t *testing.T) {
+	env := &MockedEnvironment{}
+	props := &properties{
+		values: map[Property]interface{}{
+			CacheTimeout: 1,
+			URL:          "FAKE",
+		},
+	}
+
+	cachedData := nightscoutData{
+		Sgv:       100,
+		Direction: "FortyFiveDown",
+	}
+
+	serializedCachedData, _ := json.Marshal(cachedData)
+
+	cacheMock := &MockedCache{}
+	env.On("cache", nil).Return(cacheMock)
+
+	cacheMock.On("get", "FAKE").Return(string(serializedCachedData), true)
+
+	ns := &nightscout{}
+	ns.init(props, env)
+
+	data, err := ns.getFunc()
+
+	assert.Nil(t, err, "No error expected")
+	assert.Equal(t, cachedData.Sgv, data.Sgv, "Sgv should match with cached data")
+	assert.Equal(t, cachedData.Direction, data.Direction, "Direction should match with cached data")
 }
