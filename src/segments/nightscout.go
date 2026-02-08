@@ -67,7 +67,7 @@ func (n *NightscoutData) UnmarshalJSON(data []byte) error {
 		} else if f, err := aux.Date.Float64(); err == nil {
 			n.Date = int64(f)
 		} else {
-			return err
+			return errors.New("date field must be a valid integer or floating-point number")
 		}
 	}
 
