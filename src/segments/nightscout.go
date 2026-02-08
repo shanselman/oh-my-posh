@@ -3,6 +3,7 @@ package segments
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	http2 "net/http"
 	"time"
 
@@ -65,9 +66,11 @@ func (n *NightscoutData) UnmarshalJSON(data []byte) error {
 		if i, err := aux.Date.Int64(); err == nil {
 			n.Date = i
 		} else if f, err := aux.Date.Float64(); err == nil {
+			// Truncate (not round) decimal portion when converting float to int64.
+			// This maintains consistency with implicit JSON number conversion behavior.
 			n.Date = int64(f)
 		} else {
-			return errors.New("date field must be a valid integer or floating-point number")
+			return fmt.Errorf("date field must be a valid integer or floating-point number, got: %s", aux.Date)
 		}
 	}
 
