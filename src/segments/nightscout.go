@@ -46,6 +46,34 @@ type NightscoutData struct {
 	Mills      int64     `json:"mills"`
 }
 
+// UnmarshalJSON ensures NightscoutData.Date remains an integer while
+// accepting both integer and floating-point JSON numbers for the `date` field.
+func (n *NightscoutData) UnmarshalJSON(data []byte) error {
+	type Alias NightscoutData
+	aux := &struct {
+		Date json.Number `json:"date"`
+		*Alias
+	}{
+		Alias: (*Alias)(n),
+	}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	if aux.Date != "" {
+		if i, err := aux.Date.Int64(); err == nil {
+			n.Date = i
+		} else if f, err := aux.Date.Float64(); err == nil {
+			n.Date = int64(f)
+		} else {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (ns *Nightscout) Template() string {
 	return " {{ .Sgv }} "
 }

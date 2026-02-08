@@ -1,6 +1,7 @@
 package segments
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -133,5 +134,58 @@ func TestNSSegment(t *testing.T) {
 			tc.Template = ns.Template()
 		}
 		assert.Equal(t, tc.ExpectedString, renderTemplate(env, tc.Template, ns), tc.Case)
+	}
+}
+
+func TestNightscoutDataUnmarshalJSON(t *testing.T) {
+	cases := []struct {
+		Name         string
+		JSONInput    string
+		ExpectedDate int64
+		ExpectError  bool
+	}{
+		{
+			Name:         "Integer date value",
+			JSONInput:    `{"date": 1637707537000}`,
+			ExpectedDate: 1637707537000,
+			ExpectError:  false,
+		},
+		{
+			Name:         "Floating-point date value",
+			JSONInput:    `{"date": 1637707537000.5}`,
+			ExpectedDate: 1637707537000,
+			ExpectError:  false,
+		},
+		{
+			Name:         "Floating-point date value with decimal",
+			JSONInput:    `{"date": 1637707537123.789}`,
+			ExpectedDate: 1637707537123,
+			ExpectError:  false,
+		},
+		{
+			Name:         "Invalid date value",
+			JSONInput:    `{"date": "not-a-number"}`,
+			ExpectedDate: 0,
+			ExpectError:  true,
+		},
+		{
+			Name:         "Missing date field",
+			JSONInput:    `{"sgv": 150}`,
+			ExpectedDate: 0,
+			ExpectError:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		var data NightscoutData
+		err := json.Unmarshal([]byte(tc.JSONInput), &data)
+
+		if tc.ExpectError {
+			assert.Error(t, err, tc.Name)
+			continue
+		}
+
+		assert.NoError(t, err, tc.Name)
+		assert.Equal(t, tc.ExpectedDate, data.Date, tc.Name)
 	}
 }
